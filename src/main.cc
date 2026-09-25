@@ -21,7 +21,7 @@ int main() {
       break;
     }
 
-    std::vector<std::string_view> tokens = Tokenize(input_line);
+    std::vector<std::string_view> tokens = Split(input_line);
     if (tokens.empty()) {
       continue;
     }

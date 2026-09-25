@@ -4,6 +4,7 @@
 #include <string_view>
 #include <vector>
 
-std::vector<std::string_view> Tokenize(std::string_view input);
+std::vector<std::string_view> Split(std::string_view input,
+                                    const char *delimiters = " \t\n");
 
-#endif  // TOKENIZER_H_
+#endif // TOKENIZER_H_
