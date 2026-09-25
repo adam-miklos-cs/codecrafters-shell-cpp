@@ -8,7 +8,10 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <unordered_map>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -104,6 +107,43 @@ ExecutionResult HandleType(const SimpleCommand &command) {
   return ExecutionResult{.should_exit = false, .exit_code = 1};
 }
 
+ExecutionResult ExecuteExternal(const fs::path &path,
+                                const SimpleCommand &command) {
+  // Build null-terminated argv array: [command_name, arg1, arg2, ..., nullptr].
+  std::vector<char *> args;
+  args.reserve(command.arguments.size() + 2);
+  args.push_back(const_cast<char *>(command.name.c_str()));
+  for (const auto &arg : command.arguments) {
+    args.push_back(const_cast<char *>(arg.c_str()));
+  }
+  args.push_back(nullptr);
+
+  pid_t pid = fork();
+  if (pid < 0) {
+    perror("fork");
+    return ExecutionResult{.should_exit = false, .exit_code = 1};
+  }
+
+  if (pid == 0) {
+    // Child: replace process image with target binary.
+    execv(path.c_str(), args.data());
+    // Only reached if execv fails.
+    perror("execv");
+    std::exit(1);
+  }
+
+  // Parent: wait for child to finish and extract exit code.
+  int status = 0;
+  waitpid(pid, &status, 0);
+
+  int exit_code = 0;
+  if (WIFEXITED(status)) {
+    exit_code = WEXITSTATUS(status);
+  }
+
+  return ExecutionResult{.should_exit = false, .exit_code = exit_code};
+}
+
 } // namespace
 
 ExecutionResult Execute(const SimpleCommand &command) {
@@ -112,6 +152,10 @@ ExecutionResult Execute(const SimpleCommand &command) {
   auto it = builtins.find(command.name);
   if (it != builtins.end()) {
     return it->second(command);
+  }
+
+  if (auto path = FindExecutable(command.name)) {
+    return ExecuteExternal(*path, command);
   }
 
   std::cout << command.name << ": command not found\n";
