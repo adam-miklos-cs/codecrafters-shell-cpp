@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -31,7 +32,34 @@ const std::unordered_map<std::string, BuiltinHandler> &GetBuiltins() {
   return *builtins;
 }
 
-// Handler implementations.
+// Utility functions.
+bool IsExecutableFile(const fs::path &path, std::error_code &ec) {
+  if (!fs::is_regular_file(path, ec)) {
+    return false;
+  }
+  auto perms = fs::status(path, ec).permissions();
+  return (perms & (fs::perms::owner_exec | fs::perms::group_exec |
+                   fs::perms::others_exec)) != fs::perms::none;
+}
+
+std::optional<fs::path> FindExecutable(std::string_view command_name) {
+  const char *path_env = std::getenv("PATH");
+  if (path_env == nullptr) {
+    return std::nullopt;
+  }
+
+  std::error_code ec;
+  for (const auto &dir : Split(path_env, ":")) {
+    fs::path full_path = fs::path(dir) / command_name;
+    if (IsExecutableFile(full_path, ec)) {
+      return full_path;
+    }
+  }
+
+  return std::nullopt;
+}
+
+//// Handler implementations.
 ExecutionResult HandleExit(const SimpleCommand &command) {
   int exit_code = 0;
   if (!command.arguments.empty()) {
@@ -67,30 +95,9 @@ ExecutionResult HandleType(const SimpleCommand &command) {
     return ExecutionResult{.should_exit = false, .exit_code = 0};
   }
 
-  // Read PATH environment variable.
-  const char *path = std::getenv("PATH");
-  if (path == nullptr) {
-    path = "";
-  }
-  // Split PATH into a list of directories.
-  std::vector<std::string_view> directories = Split(path, ":");
-
-  std::error_code ec;
-
-  for (const auto &dir : directories) {
-    std::string full_path = std::string(dir) + "/" + target;
-
-    // 1. Is it a regular file that exists?
-    if (fs::is_regular_file(full_path, ec)) {
-      // 2. Check execute permission bits
-      auto perms = fs::status(full_path, ec).permissions();
-      bool can_exec = (perms & (fs::perms::owner_exec | fs::perms::group_exec |
-                                fs::perms::others_exec)) != fs::perms::none;
-      if (can_exec) {
-        std::cout << target << " is " << full_path << "\n";
-        return ExecutionResult{.should_exit = false, .exit_code = 0};
-      }
-    }
+  if (auto path = FindExecutable(target)) {
+    std::cout << target << " is " << path->string() << "\n";
+    return ExecutionResult{.should_exit = false, .exit_code = 0};
   }
 
   std::cout << target << ": not found\n";
