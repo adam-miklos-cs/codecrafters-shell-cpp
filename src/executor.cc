@@ -116,7 +116,7 @@ ExecutionResult HandlePwd(const SimpleCommand &command) {
     std::error_code ec;
     fs::path wd = fs::current_path(ec);
     if(!ec){
-        std::cout << fs::current_path().string() << "\n" ;
+        std::cout << wd.string() << "\n" ;
         return ExecutionResult{.should_exit = false, .exit_code = 0};
     }
     return ExecutionResult{.should_exit = false, .exit_code = 1};
