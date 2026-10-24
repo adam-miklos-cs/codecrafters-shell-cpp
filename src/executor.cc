@@ -9,11 +9,14 @@
 #include <string>
 #include <string_view>
 #include <sys/wait.h>
+#include <system_error>
 #include <unistd.h>
 #include <unordered_map>
 #include <vector>
 
 namespace fs = std::filesystem;
+
+// TODO: Why create this namespace?
 
 namespace {
 
@@ -23,6 +26,7 @@ using BuiltinHandler = ExecutionResult (*)(const SimpleCommand &);
 ExecutionResult HandleExit(const SimpleCommand &command);
 ExecutionResult HandleEcho(const SimpleCommand &command);
 ExecutionResult HandleType(const SimpleCommand &command);
+ExecutionResult HandlePwd(const SimpleCommand& command);
 
 // The Builtin Registry (Dispatch Table).
 const std::unordered_map<std::string, BuiltinHandler> &GetBuiltins() {
@@ -31,6 +35,7 @@ const std::unordered_map<std::string, BuiltinHandler> &GetBuiltins() {
           {"exit", HandleExit},
           {"echo", HandleEcho},
           {"type", HandleType},
+          {"pwd", HandlePwd}
       };
   return *builtins;
 }
@@ -105,6 +110,16 @@ ExecutionResult HandleType(const SimpleCommand &command) {
 
   std::cout << target << ": not found\n";
   return ExecutionResult{.should_exit = false, .exit_code = 1};
+}
+
+ExecutionResult HandlePwd(const SimpleCommand &command) {
+    std::error_code ec;
+    fs::path wd = fs::current_path(ec);
+    if(!ec){
+        std::cout << fs::current_path().string() << "\n" ;
+        return ExecutionResult{.should_exit = false, .exit_code = 0};
+    }
+    return ExecutionResult{.should_exit = false, .exit_code = 1};
 }
 
 ExecutionResult ExecuteExternal(const fs::path &path,
