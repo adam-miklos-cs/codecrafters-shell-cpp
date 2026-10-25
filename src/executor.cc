@@ -131,8 +131,16 @@ ExecutionResult HandleCd(const SimpleCommand &command) {
   if (command.arguments.empty()) {
     return ExecutionResult{.should_exit = false, .exit_code = 1};
   }
+  std::string target_path = command.arguments[0];
 
-  const std::string &target_path = command.arguments[0];
+  if (target_path.starts_with('~')) {
+    const char *home_env = std::getenv("HOME");
+    if (home_env == nullptr) {
+      return ExecutionResult{.should_exit = false, .exit_code = 1};
+    }
+    target_path = std::string(home_env) + target_path.substr(1);
+  }
+
   std::error_code ec;
   fs::current_path(target_path, ec);
   if (ec) {
