@@ -1,6 +1,7 @@
 #include "executor.h"
 
-#include "tokenizer.h"
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include <cstdlib>
 #include <filesystem>
@@ -8,11 +9,11 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <sys/wait.h>
 #include <system_error>
-#include <unistd.h>
 #include <unordered_map>
 #include <vector>
+
+#include "tokenizer.h"
 
 namespace fs = std::filesystem;
 
@@ -26,8 +27,8 @@ using BuiltinHandler = ExecutionResult (*)(const SimpleCommand &);
 ExecutionResult HandleExit(const SimpleCommand &command);
 ExecutionResult HandleEcho(const SimpleCommand &command);
 ExecutionResult HandleType(const SimpleCommand &command);
-ExecutionResult HandlePwd(const SimpleCommand& command);
-ExecutionResult HandleCd(const SimpleCommand& command);
+ExecutionResult HandlePwd(const SimpleCommand &command);
+ExecutionResult HandleCd(const SimpleCommand &command);
 
 // The Builtin Registry (Dispatch Table).
 const std::unordered_map<std::string, BuiltinHandler> &GetBuiltins() {

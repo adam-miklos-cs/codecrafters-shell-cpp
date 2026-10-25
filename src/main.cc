@@ -1,6 +1,5 @@
 #include <iostream>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "executor.h"
@@ -16,17 +15,18 @@ int main() {
   while (true) {
     std::cout << "$ ";
 
+    // What can I assume here? This input_line will end at a correct place even with quotes?
     std::string input_line;
     if (!std::getline(std::cin, input_line)) {
       break;
     }
 
-    std::vector<std::string_view> tokens = Split(input_line);
+    std::vector<std::string> tokens = SplitWithQuoting(input_line);
     if (tokens.empty()) {
       continue;
     }
 
-    SimpleCommand simple_command = ParseSimpleCommand(tokens);
+    SimpleCommand simple_command = ParseSimpleCommand(std::move(tokens));
 
     ExecutionResult result = Execute(simple_command);
     if (result.should_exit) {
