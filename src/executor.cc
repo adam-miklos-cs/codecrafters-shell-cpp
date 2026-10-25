@@ -27,6 +27,7 @@ ExecutionResult HandleExit(const SimpleCommand &command);
 ExecutionResult HandleEcho(const SimpleCommand &command);
 ExecutionResult HandleType(const SimpleCommand &command);
 ExecutionResult HandlePwd(const SimpleCommand& command);
+ExecutionResult HandleCd(const SimpleCommand& command);
 
 // The Builtin Registry (Dispatch Table).
 const std::unordered_map<std::string, BuiltinHandler> &GetBuiltins() {
@@ -35,7 +36,8 @@ const std::unordered_map<std::string, BuiltinHandler> &GetBuiltins() {
           {"exit", HandleExit},
           {"echo", HandleEcho},
           {"type", HandleType},
-          {"pwd", HandlePwd}
+          {"pwd", HandlePwd},
+          {"cd", HandleCd}
       };
   return *builtins;
 }
@@ -69,13 +71,15 @@ std::optional<fs::path> FindExecutable(std::string_view command_name) {
 
 //// Handler implementations.
 ExecutionResult HandleExit(const SimpleCommand &command) {
+  if (command.arguments.empty()) {
+    return ExecutionResult{.should_exit = true, .exit_code = 0};
+  }
+
   int exit_code = 0;
-  if (!command.arguments.empty()) {
-    try {
-      exit_code = std::stoi(command.arguments[0]);
-    } catch (...) {
-      exit_code = 0;
-    }
+  try {
+    exit_code = std::stoi(command.arguments[0]);
+  } catch (...) {
+    exit_code = 0;
   }
   return ExecutionResult{.should_exit = true, .exit_code = exit_code};
 }
@@ -113,13 +117,30 @@ ExecutionResult HandleType(const SimpleCommand &command) {
 }
 
 ExecutionResult HandlePwd(const SimpleCommand &command) {
-    std::error_code ec;
-    fs::path wd = fs::current_path(ec);
-    if(!ec){
-        std::cout << wd.string() << "\n" ;
-        return ExecutionResult{.should_exit = false, .exit_code = 0};
-    }
+  std::error_code ec;
+  fs::path wd = fs::current_path(ec);
+  if (ec) {
     return ExecutionResult{.should_exit = false, .exit_code = 1};
+  }
+
+  std::cout << wd.string() << "\n";
+  return ExecutionResult{.should_exit = false, .exit_code = 0};
+}
+
+ExecutionResult HandleCd(const SimpleCommand &command) {
+  if (command.arguments.empty()) {
+    return ExecutionResult{.should_exit = false, .exit_code = 1};
+  }
+
+  const std::string &target_path = command.arguments[0];
+  std::error_code ec;
+  fs::current_path(target_path, ec);
+  if (ec) {
+    std::cout << "cd: " << target_path << ": No such file or directory\n";
+    return ExecutionResult{.should_exit = false, .exit_code = 1};
+  }
+
+  return ExecutionResult{.should_exit = false, .exit_code = 0};
 }
 
 ExecutionResult ExecuteExternal(const fs::path &path,

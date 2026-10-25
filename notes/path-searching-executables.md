@@ -112,3 +112,7 @@ std::optional<fs::path> FindExecutable(std::string_view command_name) {
 
 **Answer**: A directory separator divides folders in a single path (`/` or `\`, handled by `fs::path::preferred_separator` and `operator/`). A PATH list delimiter divides separate directories in an environment variable (`:` on POSIX, `;` on Windows, requiring manual `#if defined(_WIN32)`).
 </details>
+
+---
+
+*See also: [Process Working Directory, `task_struct`, and `pwd` / `cd`](process-working-directory-task-struct.md) — extends non-throwing `<filesystem>` usage (`std::error_code ec`) and dynamic on-demand resolution to kernel `dentry` trees.*

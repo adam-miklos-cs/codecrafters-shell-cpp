@@ -56,3 +56,33 @@ struct path {
     struct dentry *dentry; // Pointer to the live directory node in the VFS tree
 };
 ```
+
+---
+
+## What Happens During `fork()` (`copy_fs` in `kernel/fork.c`)
+
+When a shell calls `fork()`, the kernel allocates a **new** `task_struct` and a **new** `fs_struct` for the child, copying the `pwd.dentry` pointer value from the parent:
+
+```mermaid
+graph TD
+    subgraph Parent Shell Process
+        P_TS["Parent <b>task_struct</b>"] -->|fs| P_FS["Parent <b>fs_struct</b> (@ 0x1000)<br/>pwd.dentry"]
+    end
+
+    subgraph Child Process ["Child Process (after fork)"]
+        C_TS["Child <b>task_struct</b>"] -->|fs| C_FS["Child <b>fs_struct</b> (@ 0x2000)<br/>pwd.dentry (copied!)"]
+    end
+
+    subgraph Kernel Dentry Cache
+        D_HOME["<b>dentry: '/home/adam'</b>"]
+        D_TMP["<b>dentry: '/tmp'</b>"]
+    end
+
+    P_FS -->|points to| D_HOME
+    C_FS -.->|"1. Right after fork(): points to"| D_HOME
+    C_FS ==>|"2. After child calls chdir('/tmp'): points to"| D_TMP
+```
+
+- **Why `/bin/pwd` works in a child**: Right after `fork()`, the child's `fs_struct->pwd` points to the exact same `dentry` (`/home/adam`) as the parent. Reading and printing it gives the parent's current directory.
+- **Why `/bin/cd` cannot work in a child**: Calling `chdir("/tmp")` inside the child only repoints the **child's** `fs_struct->pwd` (`@ 0x2000`) to `/tmp`. Then the child exits and `@ 0x2000` is freed—leaving the parent shell's `fs_struct->pwd` (`@ 0x1000`) untouched at `/home/adam`!
+
