@@ -1,5 +1,6 @@
 #include "executor.h"
 
+#include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -17,34 +18,30 @@
 
 namespace fs = std::filesystem;
 
-// TODO: Why create this namespace?
-
 namespace {
 
-using BuiltinHandler = ExecutionResult (*)(const SimpleCommand &);
+using BuiltinHandler = ExecutionResult (*)(const SimpleCommand&);
 
 // Forward declarations of individual builtin handlers.
-ExecutionResult HandleExit(const SimpleCommand &command);
-ExecutionResult HandleEcho(const SimpleCommand &command);
-ExecutionResult HandleType(const SimpleCommand &command);
-ExecutionResult HandlePwd(const SimpleCommand &command);
-ExecutionResult HandleCd(const SimpleCommand &command);
+ExecutionResult HandleExit(const SimpleCommand& command);
+ExecutionResult HandleEcho(const SimpleCommand& command);
+ExecutionResult HandleType(const SimpleCommand& command);
+ExecutionResult HandlePwd(const SimpleCommand& command);
+ExecutionResult HandleCd(const SimpleCommand& command);
 
 // The Builtin Registry (Dispatch Table).
-const std::unordered_map<std::string, BuiltinHandler> &GetBuiltins() {
-  static const auto *builtins =
-      new std::unordered_map<std::string, BuiltinHandler>{
-          {"exit", HandleExit},
-          {"echo", HandleEcho},
-          {"type", HandleType},
-          {"pwd", HandlePwd},
-          {"cd", HandleCd}
-      };
+const std::unordered_map<std::string, BuiltinHandler>& GetBuiltins() {
+  static const auto* builtins =
+      new std::unordered_map<std::string, BuiltinHandler>{{"exit", HandleExit},
+                                                          {"echo", HandleEcho},
+                                                          {"type", HandleType},
+                                                          {"pwd", HandlePwd},
+                                                          {"cd", HandleCd}};
   return *builtins;
 }
 
 // Utility functions.
-bool IsExecutableFile(const fs::path &path, std::error_code &ec) {
+bool IsExecutableFile(const fs::path& path, std::error_code& ec) {
   if (!fs::is_regular_file(path, ec)) {
     return false;
   }
@@ -54,13 +51,13 @@ bool IsExecutableFile(const fs::path &path, std::error_code &ec) {
 }
 
 std::optional<fs::path> FindExecutable(std::string_view command_name) {
-  const char *path_env = std::getenv("PATH");
+  const char* path_env = std::getenv("PATH");
   if (path_env == nullptr) {
     return std::nullopt;
   }
 
   std::error_code ec;
-  for (const auto &dir : Split(path_env, ":")) {
+  for (const auto& dir : Split(path_env, ":")) {
     fs::path full_path = fs::path(dir) / command_name;
     if (IsExecutableFile(full_path, ec)) {
       return full_path;
@@ -71,7 +68,7 @@ std::optional<fs::path> FindExecutable(std::string_view command_name) {
 }
 
 //// Handler implementations.
-ExecutionResult HandleExit(const SimpleCommand &command) {
+ExecutionResult HandleExit(const SimpleCommand& command) {
   if (command.arguments.empty()) {
     return ExecutionResult{.should_exit = true, .exit_code = 0};
   }
@@ -85,23 +82,22 @@ ExecutionResult HandleExit(const SimpleCommand &command) {
   return ExecutionResult{.should_exit = true, .exit_code = exit_code};
 }
 
-ExecutionResult HandleEcho(const SimpleCommand &command) {
+ExecutionResult HandleEcho(const SimpleCommand& command) {
   for (size_t i = 0; i < command.arguments.size(); ++i) {
-    if (i > 0)
-      std::cout << " ";
+    if (i > 0) std::cout << " ";
     std::cout << command.arguments[i];
   }
   std::cout << "\n";
   return ExecutionResult{.should_exit = false, .exit_code = 0};
 }
 
-ExecutionResult HandleType(const SimpleCommand &command) {
+ExecutionResult HandleType(const SimpleCommand& command) {
   if (command.arguments.empty()) {
     return ExecutionResult{.should_exit = false, .exit_code = 1};
   }
 
-  const std::string &target = command.arguments[0];
-  const auto &builtins = GetBuiltins();
+  const std::string& target = command.arguments[0];
+  const auto& builtins = GetBuiltins();
 
   if (builtins.contains(target)) {
     std::cout << target << " is a shell builtin\n";
@@ -117,7 +113,7 @@ ExecutionResult HandleType(const SimpleCommand &command) {
   return ExecutionResult{.should_exit = false, .exit_code = 1};
 }
 
-ExecutionResult HandlePwd(const SimpleCommand &command) {
+ExecutionResult HandlePwd(const SimpleCommand& command) {
   std::error_code ec;
   fs::path wd = fs::current_path(ec);
   if (ec) {
@@ -128,14 +124,14 @@ ExecutionResult HandlePwd(const SimpleCommand &command) {
   return ExecutionResult{.should_exit = false, .exit_code = 0};
 }
 
-ExecutionResult HandleCd(const SimpleCommand &command) {
+ExecutionResult HandleCd(const SimpleCommand& command) {
   if (command.arguments.empty()) {
     return ExecutionResult{.should_exit = false, .exit_code = 1};
   }
   std::string target_path = command.arguments[0];
 
   if (target_path.starts_with('~')) {
-    const char *home_env = std::getenv("HOME");
+    const char* home_env = std::getenv("HOME");
     if (home_env == nullptr) {
       return ExecutionResult{.should_exit = false, .exit_code = 1};
     }
@@ -152,20 +148,19 @@ ExecutionResult HandleCd(const SimpleCommand &command) {
   return ExecutionResult{.should_exit = false, .exit_code = 0};
 }
 
-ExecutionResult ExecuteExternal(const fs::path &path,
-                                const SimpleCommand &command) {
+ExecutionResult ExecuteExternal(const fs::path& path,
+                                const SimpleCommand& command) {
   // Build null-terminated argv array: [command_name, arg1, arg2, ..., nullptr].
-  std::vector<char *> args;
+  std::vector<char*> args;
   args.reserve(command.arguments.size() + 2);
-  args.push_back(const_cast<char *>(command.name.c_str()));
-  for (const auto &arg : command.arguments) {
-    args.push_back(const_cast<char *>(arg.c_str()));
+  args.push_back(const_cast<char*>(command.name.c_str()));
+  for (const auto& arg : command.arguments) {
+    args.push_back(const_cast<char*>(arg.c_str()));
   }
   args.push_back(nullptr);
 
   pid_t pid = fork();
   if (pid < 0) {
-    perror("fork");
     return ExecutionResult{.should_exit = false, .exit_code = 1};
   }
 
@@ -173,7 +168,6 @@ ExecutionResult ExecuteExternal(const fs::path &path,
     // Child: replace process image with target binary.
     execv(path.c_str(), args.data());
     // Only reached if execv fails.
-    perror("execv");
     std::exit(1);
   }
 
@@ -189,20 +183,45 @@ ExecutionResult ExecuteExternal(const fs::path &path,
   return ExecutionResult{.should_exit = false, .exit_code = exit_code};
 }
 
-} // namespace
+bool ApplyRedirects(const std::vector<StreamRedirect>& redirects) {
+  for (const auto& r : redirects) {
+    int flags = O_WRONLY | O_CREAT | (r.append ? O_APPEND : O_TRUNC);
+    int fd = open(r.path.c_str(), flags, 0644);
+    if (fd < 0) {
+      return false;
+    }
+    dup2(fd, r.target_fd);
+    close(fd);
+  }
+  return true;
+}
 
-ExecutionResult Execute(const SimpleCommand &command) {
-  const auto &builtins = GetBuiltins();
+}  // namespace
 
-  auto it = builtins.find(command.name);
-  if (it != builtins.end()) {
-    return it->second(command);
+ExecutionResult Execute(const SimpleCommand& command) {
+  int saved_stdout = dup(STDOUT_FILENO);
+  int saved_stderr = dup(STDERR_FILENO);
+
+  ExecutionResult result{.should_exit = false, .exit_code = 1};
+
+  if (ApplyRedirects(command.redirects)) {
+    const auto& builtins = GetBuiltins();
+
+    auto it = builtins.find(command.name);
+    if (it != builtins.end()) {
+      result = it->second(command);
+    } else if (auto path = FindExecutable(command.name)) {
+      result = ExecuteExternal(*path, command);
+    } else {
+      std::cout << command.name << ": command not found\n";
+      result = ExecutionResult{.should_exit = false, .exit_code = 127};
+    }
   }
 
-  if (auto path = FindExecutable(command.name)) {
-    return ExecuteExternal(*path, command);
-  }
+  dup2(saved_stdout, STDOUT_FILENO);
+  close(saved_stdout);
+  dup2(saved_stderr, STDERR_FILENO);
+  close(saved_stderr);
 
-  std::cout << command.name << ": command not found\n";
-  return ExecutionResult{.should_exit = false, .exit_code = 127};
+  return result;
 }
