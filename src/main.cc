@@ -21,7 +21,7 @@ int main() {
       break;
     }
 
-    std::vector<std::string> tokens = SplitWithQuoting(input_line);
+    std::vector<std::string> tokens = SplitWithShellBehaviour(input_line);
     if (tokens.empty()) {
       continue;
     }

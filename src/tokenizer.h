@@ -8,6 +8,6 @@
 std::vector<std::string_view> Split(std::string_view input,
                                     const char *delimiters = " \t\n");
 
-std::vector<std::string> SplitWithQuoting(std::string_view input);
+std::vector<std::string> SplitWithShellBehaviour(std::string_view input);
 
 #endif // TOKENIZER_H_
